@@ -2,6 +2,7 @@ import csv
 from sklearn import svm
 import sklearn.ensemble
 import time
+from sklearn import linear_model
 # import sklearn.linear_model
 
 start_time = time.clock()
@@ -28,10 +29,13 @@ def getXy(list_of_days, down_sample=37):
                 y.append(result)
     return X, y
 
-X, y = getXy([1218, 1205, 1129, 1123], 22)
+X, y = getXy([1218, 1208, 1204, 1123], 30)
+# X, y = getXy([1218], 30)
 
 
-clf = svm.SVC(kernel='rbf', C=0.9, gamma=13)
+
+clf = svm.SVC(kernel='rbf', C=2.1, gamma=0.07)
+# clf = svm.SVC(kernel='linear')
 clf.fit(X, y)
 # clf = sklearn.ensemble.RandomForestClassifier(200)
 # clf.fit(X, y)
@@ -80,16 +84,16 @@ X = []
 reader = csv.reader(file('output/features_1219.csv', 'r'))
 for row in reader:
     X.append(row[2:])
-
+ 
 predict = clf.predict(X)
-
+ 
 writer = csv.writer(file('output/tianchi_mobile_recommendation_predict.csv', 'w'))
 reader = csv.reader(file('output/features_1219.csv', 'r'))
-  
+   
 writer.writerow(['user_id', 'item_id'])
 for (x, y) in zip(reader, predict):
     if int(y) == 1:
         writer.writerow([str(x[0]), str(x[1])])
-
+ 
 stop_time = time.clock()
 print stop_time - start_time
