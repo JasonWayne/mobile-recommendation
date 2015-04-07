@@ -2,6 +2,7 @@ import csv
 import time
 from constants import *
 import numpy as np
+import MySQLdb
 
 class TimeUtil():
     @staticmethod
@@ -23,6 +24,28 @@ class TimeUtil():
         day_interval = predict_day - behavior_date
         
         return day_interval * 24 - behavior_hour 
+
+    @staticmethod
+    def get_last_seven_days_str(predict_day):
+        #example return input: 1128, output: ['2014-11-21', '2014-11-22', ... , '2014-11-27']
+        yesterday = TimeUtil.yesterday(predict_day)
+        l = []
+        for i in range(7):
+            month = yesterday / 100
+            day = yesterday % 100
+            l.append('2014-%d-%d' % (month, day))
+            yesterday = TimeUtil.yesterday(yesterday)
+        return l
+    
+    @staticmethod
+    def yesterday(day):
+        '''input: 1201
+            output:1130
+            designed for dates between 20141119 - 20141220
+        '''
+        return day - 1 if day != 1201 else 1130
+        
+        
         
              
 
@@ -175,16 +198,56 @@ class FeatureGetter():
         self.normalize_column(14)
 
     def add_item_feature(self):
-        reader = csv.reader(file('output/item_total_bought.csv', 'r'))
+        # get last 7 days bought information
+        con = MySQLdb.connect('localhost', 'root','', 'mobile_recommendation')
+        cursor = con.cursor()
+        data = []
+        
+        dates = TimeUtil.get_last_seven_days_str(self.predict_day)
+        sql = "SELECT item_id, COUNT(*) FROM users_filtered WHERE behavior_type = 4 AND \
+            (time LIKE '%s%%'   \
+            or time LIKE '%s%%' \
+            or time LIKE '%s%%' \
+            or time LIKE '%s%%' \
+            or time LIKE '%s%%' \
+            or time LIKE '%s%%' \
+            or time LIKE '%s%%') \
+            GROUP BY item_id" % tuple(dates)
+        cursor.execute(sql)
+        
+        for row in cursor:
+            row = list(row)
+            row[0] = int(row[0])
+            data.append(row)
+        
+        total = 0
+        line_count = 0
+        max_val = 0
+        for row in data:
+            if int(row[1]) > max_val:
+                max_val = int(row[1])
+            total += int(row[1])
+            line_count += 1
+        mean = float(total) / line_count
+        
+        total = 0
+        for row in data:
+            total += (float(row[1]) - mean) ** 2
+        std = total / line_count
+        
+        for row in data:
+            row[1] = (float(row[1]) - mean) / std
+
         d = {}
-        for row in reader:
+        for row in data:
             d[row[0]] = row[1]
 #         print d
         for row in self.data:
-            if d.get(str(row[1])):
-                row.append(d.get(str(row[1])))
+            if d.get(int(row[1])):
+                row.append(d.get(int(row[1])))
             else:
-                row.append(-1.30587514842)
+#                 row.append((0-mean) / std)
+                row.append(-1)
     
     def output(self):
         print time.ctime() + " --> output()"

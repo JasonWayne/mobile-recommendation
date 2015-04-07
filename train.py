@@ -34,7 +34,9 @@ X, y = getXy([1218, 1208, 1204, 1123], 30)
 
 
 
-clf = svm.SVC(kernel='rbf', C=2.1, gamma=0.07)
+# clf =svm.SVC(kernel='rbf', C=1, gamma=13)
+clf =svm.SVC(kernel='rbf', C=3.2, gamma=0.60)
+# clf = svm.SVC(kernel='rbf', C=2.1, gamma=0.07)
 # clf = svm.SVC(kernel='linear')
 clf.fit(X, y)
 # clf = sklearn.ensemble.RandomForestClassifier(200)
@@ -84,16 +86,16 @@ X = []
 reader = csv.reader(file('output/features_1219.csv', 'r'))
 for row in reader:
     X.append(row[2:])
- 
+  
 predict = clf.predict(X)
- 
+  
 writer = csv.writer(file('output/tianchi_mobile_recommendation_predict.csv', 'w'))
 reader = csv.reader(file('output/features_1219.csv', 'r'))
-   
+    
 writer.writerow(['user_id', 'item_id'])
 for (x, y) in zip(reader, predict):
     if int(y) == 1:
         writer.writerow([str(x[0]), str(x[1])])
- 
+  
 stop_time = time.clock()
 print stop_time - start_time
