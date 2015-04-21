@@ -4,51 +4,6 @@ from constants import *
 import numpy as np
 import MySQLdb
 
-class TimeUtil():
-    @staticmethod
-    def format_date(s):
-        return int(s[5:7] + s[8:10])
-    
-    @staticmethod
-    def format_hour(s):
-        return int(s[11:13])
-    
-    @staticmethod
-    def calc_interval(predict_day, s):
-        behavior_date = TimeUtil.format_date(s)
-        behavior_hour = TimeUtil.format_hour(s)
-        if predict_day / 100 == 12 and behavior_date / 100 == 11:
-            predict_day += 30
-        predict_day %= 100
-        behavior_date %= 100
-        day_interval = predict_day - behavior_date
-        
-        return day_interval * 24 - behavior_hour 
-
-    @staticmethod
-    def get_last_seven_days_str(predict_day):
-        #example return input: 1128, output: ['2014-11-21', '2014-11-22', ... , '2014-11-27']
-        yesterday = TimeUtil.yesterday(predict_day)
-        l = []
-        for i in range(7):
-            month = yesterday / 100
-            day = yesterday % 100
-            l.append('2014-%d-%d' % (month, day))
-            yesterday = TimeUtil.yesterday(yesterday)
-        return l
-    
-    @staticmethod
-    def yesterday(day):
-        '''input: 1201
-            output:1130
-            designed for dates between 20141119 - 20141220
-        '''
-        return day - 1 if day != 1201 else 1130
-        
-        
-        
-             
-
 class ResultsGetter():
     def __init__(self, predict_day):
         self.predict_day = predict_day
@@ -116,11 +71,15 @@ class FeatureGetter():
 #             if count % 1000 == 0:
 #                 print "do with %d's line" % count
             
-            if TimeUtil.format_date(row[5]) > (self.predict_day - 1) or TimeUtil.format_date(row[5]) < (self.predict_day - 3):
+            if TimeUtil.format_date(row[5]) > (self.predict_day - 1) or TimeUtil.format_date(row[5]) < (self.predict_day - 2):
                 continue
             
+#             if TimeUtil.format_date(row[5]) == (self.predict_day - 3) and TimeUtil.format_hour(row[5]) <= 12:
+#                 continue
+#             
             new_row = [int(row[0]), int(row[1])] 
     
+            # add features of seven days behavior
             self.append_four_features(row, new_row)
                 
             # add features of last day behavior
@@ -141,9 +100,10 @@ class FeatureGetter():
             self.data.append(new_row)
 
     def add_two_row(self, r1, r2):
-        for i in range(2, 14):
+        to = 14
+        for i in range(2, to):
             r1[i] = str(int(r1[i]) + int(r2[i]))
-        r1[14] = max(r1[14], r2[14])
+        r1[to] = min(r1[to], r2[to])
         return r1
     
     def sort(self):
@@ -170,74 +130,28 @@ class FeatureGetter():
             reduced.append(previous_row)
         
         self.data = reduced
-        
-    def normalize_column(self, column_number):
-        total = 0
-        line_count = 0
-        max_val = 0
-        for row in self.data:
-            if int(row[column_number]) > max_val:
-                max_val = int(row[column_number])
-            total += int(row[column_number])
-            line_count += 1
-        mean = float(total) / line_count
-        
-        total = 0
-        for row in self.data:
-            total += (float(row[column_number]) - mean) ** 2
-        std = total / line_count
-        
-        for row in self.data:
-            row[column_number] = (float(row[column_number]) - mean) / std
-            
     
-    def normalize(self):
-        self.normalize_column(2)
-        self.normalize_column(6)
-        self.normalize_column(10)
-        self.normalize_column(14)
-
-    def add_item_feature(self):
-        # get last 7 days bought information
+    def add_item_last_days_interact(self, days):
+        data = []
+        fun = None
+        if days == 15:
+            fun = TimeUtil.fifteen_days_before
+        elif days == 7:
+            fun = TimeUtil.seven_days_before
+        else:
+            fun = TimeUtil.three_days_before
         con = MySQLdb.connect('localhost', 'root','', 'mobile_recommendation')
         cursor = con.cursor()
-        data = []
-        
-        dates = TimeUtil.get_last_seven_days_str(self.predict_day)
-        sql = "SELECT item_id, COUNT(*) FROM users_filtered WHERE behavior_type = 4 AND \
-            (time LIKE '%s%%'   \
-            or time LIKE '%s%%' \
-            or time LIKE '%s%%' \
-            or time LIKE '%s%%' \
-            or time LIKE '%s%%' \
-            or time LIKE '%s%%' \
-            or time LIKE '%s%%') \
-            GROUP BY item_id" % tuple(dates)
+        sql = "SELECT DISTINCT(item_id), COUNT(*) FROM users_filtered WHERE \
+                 time > '%s' and time < '%s' GROUP BY item_id;" % (TimeUtil.get_day_str(fun(self.predict_day)), TimeUtil.get_day_str(self.predict_day))
         cursor.execute(sql)
         
         for row in cursor:
             row = list(row)
             row[0] = int(row[0])
             data.append(row)
-        
-        total = 0
-        line_count = 0
-        max_val = 0
-        for row in data:
-            if int(row[1]) > max_val:
-                max_val = int(row[1])
-            total += int(row[1])
-            line_count += 1
-        mean = float(total) / line_count
-        
-        total = 0
-        for row in data:
-            total += (float(row[1]) - mean) ** 2
-        std = total / line_count
-        
-        for row in data:
-            row[1] = (float(row[1]) - mean) / std
 
+        
         d = {}
         for row in data:
             d[row[0]] = row[1]
@@ -246,8 +160,159 @@ class FeatureGetter():
             if d.get(int(row[1])):
                 row.append(d.get(int(row[1])))
             else:
-#                 row.append((0-mean) / std)
-                row.append(-1)
+                row.append(0)
+                
+        cursor.close()
+        con.close()
+    
+    def add_item_last_days_buy(self, days):
+        data = []
+        fun = None
+        if days == 15:
+            fun = TimeUtil.fifteen_days_before
+        elif days == 7:
+            fun = TimeUtil.seven_days_before
+        else:
+            fun = TimeUtil.three_days_before
+        con = MySQLdb.connect('localhost', 'root','', 'mobile_recommendation')
+        cursor = con.cursor()
+        sql = "SELECT DISTINCT(item_id), COUNT(*) FROM users_filtered WHERE behavior_type = 4 AND \
+                 time > '%s' and time < '%s' GROUP BY item_id;" % (TimeUtil.get_day_str(fun(self.predict_day)), TimeUtil.get_day_str(self.predict_day))
+        cursor.execute(sql)
+        
+        for row in cursor:
+            row = list(row)
+            row[0] = int(row[0])
+            data.append(row)
+
+        
+        d = {}
+        for row in data:
+            d[row[0]] = row[1]
+#         print d
+        for row in self.data:
+            if d.get(int(row[1])):
+                row.append(d.get(int(row[1])))
+            else:
+                row.append(0)
+                
+        cursor.close()
+        con.close()
+
+    def add_item_feature(self):
+        print time.ctime() + ' --> add_item_feature()'
+        # get last 7 days bought information
+        self.add_item_last_days_buy(15)
+        self.add_item_last_days_buy(7)
+        self.add_item_last_days_buy(3)
+        # of no use
+        self.add_item_last_days_interact(15)
+        self.add_item_last_days_interact(7)
+        self.add_item_last_days_interact(3)
+
+                
+    def get_user_data_from_db(self, behavior_type):
+        data = []
+        con = MySQLdb.connect("localhost", 'root', '', 'mobile_recommendation')
+        cursor = con.cursor()
+        sql = "SELECT user_id, count(*) FROM users_filtered WHERE behavior_type = %d and \
+                time < '%s%%' \
+                 GROUP BY user_id" % (behavior_type, TimeUtil.get_day_str(self.predict_day))
+        cursor.execute(sql)
+        con.close()
+        
+        for row in cursor:
+            row = list(row)
+            row[0] = int(row[0])
+            data.append(row)
+        
+        d = {}
+        for row in data:
+            d[int(row[0])] = row[1]
+        return d
+    
+    def append_row(self, d, default_value):
+        for row in self.data:
+            if d.get(int(row[0])):
+                row.append(d.get(int(row[0])))
+            else:
+                row.append(default_value)
+                
+    def add_user_last_days_buy(self, days):
+        data = []
+        con = MySQLdb.connect("localhost", 'root', '', 'mobile_recommendation')
+        cursor = con.cursor()
+        fun = None
+        if days == 15:
+            fun = TimeUtil.fifteen_days_before
+        elif days == 7:
+            fun = TimeUtil.seven_days_before
+        else:
+            fun = TimeUtil.three_days_before
+        sql = "SELECT DISTINCT(user_id), COUNT(*) FROM users_filtered WHERE behavior_type = 4 AND \
+                 time > '%s' and time < '%s' GROUP BY user_id;" % (TimeUtil.get_day_str(fun(self.predict_day)), TimeUtil.get_day_str(self.predict_day))
+        cursor.execute(sql)
+        
+        for row in cursor:
+            row = list(row)
+            row[0] = int(row[0])
+            data.append(row)
+            
+        d = {}
+        for row in data:
+            d[row[0]] = row[1]
+#         print d
+        for row in self.data:
+            if d.get(int(row[0])):
+                row.append(d.get(int(row[0])))
+            else:
+                row.append(0)
+                 
+        cursor.execute(sql)
+        con.close()
+    
+    def add_user_last_days_interact(self, days):
+        data = []
+        con = MySQLdb.connect("localhost", 'root', '', 'mobile_recommendation')
+        cursor = con.cursor()
+        fun = None
+        if days == 15:
+            fun = TimeUtil.fifteen_days_before
+        elif days == 7:
+            fun = TimeUtil.seven_days_before
+        else:
+            fun = TimeUtil.three_days_before
+        sql = "SELECT DISTINCT(user_id), COUNT(*) FROM users_filtered WHERE \
+                 time > '%s' and time < '%s' GROUP BY user_id;" % (TimeUtil.get_day_str(fun(self.predict_day)), TimeUtil.get_day_str(self.predict_day))
+        cursor.execute(sql)
+        
+        for row in cursor:
+            row = list(row)
+            row[0] = int(row[0])
+            data.append(row)
+            
+        d = {}
+        for row in data:
+            d[row[0]] = row[1]
+#         print d
+        for row in self.data:
+            if d.get(int(row[0])):
+                row.append(d.get(int(row[0])))
+            else:
+                row.append(0)
+                 
+        cursor.execute(sql)
+        con.close()
+
+            
+    def add_user_feature(self):
+        print time.ctime() + " --> add_user_feature() "
+        self.add_user_last_days_buy(15)
+        self.add_user_last_days_buy(7)
+        self.add_user_last_days_buy(3)
+        self.add_user_last_days_interact(15)
+        self.add_user_last_days_interact(7)
+        self.add_user_last_days_interact(3)
     
     def output(self):
         print time.ctime() + " --> output()"
@@ -260,8 +325,9 @@ class FeatureGetter():
         self.mapper()
         self.sort()
         self.reducer()
-        self.normalize()
+#         self.normalize()
         self.add_item_feature()
+        self.add_user_feature()
         self.output()
         
 def train(day):
@@ -273,12 +339,23 @@ def train(day):
 
 def format_features():
     start = time.clock()
-    train(1218)
-    train(1208)
-    train(1204)
-    train(1123)
+#     train(1218)
+#     train(1217)
+    train(1216)
+    train(1215)
 
-    train(1217)
+    train(1208)
+    train(1209)
+#     train(1206)
+#     train(1205)
+#     train(1204)
+    train(1130)
+#     train(1129)
+#     train(1128)
+#     train(1127)
+
+#     train(1122)
+
     end = time.clock()
     print end-start
 
@@ -286,8 +363,9 @@ def submit():
     getter = FeatureGetter(1219)
     getter.get_features()
 
-format_features()
-submit()
+if __name__ == "__main__":
+#     format_features()
+    submit()
 
 
 
