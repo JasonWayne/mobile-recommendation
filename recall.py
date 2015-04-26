@@ -3,10 +3,10 @@ import csv
 from prepare_data import TimeUtil
 
 def get_buy_result(predict_day):
-    day = TimeUtil.get_day_str(predict_day)
+    cart_day = TimeUtil.get_day_str(predict_day)
     con = MySQLdb.connect("localhost", "root", "", "mobile_recommendation")
     cursor = con.cursor()
-    sql = "SELECT user_id, item_id FROM users_filtered WHERE time LIKE '%s%%' and behavior_type = 4" % day
+    sql = "SELECT user_id, item_id FROM users_filtered WHERE time LIKE '%s%%' and behavior_type = 4" % cart_day
     writer = csv.writer(file("output/real_buy_%d.csv" % predict_day, 'wb')) 
     cursor.execute(sql)
     count = 0
@@ -52,7 +52,7 @@ def get_buy_in_1205():
     print count
 
 def all_result():
-    for day in range(1122, 1131) + range(1201, 1219):
-        get_buy_result(day)
+    for cart_day in range(1122, 1131) + range(1201, 1219):
+        get_buy_result(cart_day)
 
 all_result()

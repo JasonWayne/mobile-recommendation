@@ -71,7 +71,7 @@ class FeatureGetter():
 #             if count % 1000 == 0:
 #                 print "do with %d's line" % count
             
-            if TimeUtil.format_date(row[5]) > (self.predict_day - 1) or TimeUtil.format_date(row[5]) < (self.predict_day - 2):
+            if TimeUtil.format_date(row[5]) > (self.predict_day - 1) or TimeUtil.format_date(row[5]) < (self.predict_day - 1):
                 continue
             
 #             if TimeUtil.format_date(row[5]) == (self.predict_day - 3) and TimeUtil.format_hour(row[5]) <= 12:
@@ -82,13 +82,13 @@ class FeatureGetter():
             # add features of seven days behavior
             self.append_four_features(row, new_row)
                 
-            # add features of last day behavior
+            # add features of last cart_day behavior
             if TimeUtil.format_date(row[5]) == (self.predict_day - 1):
                 self.append_four_features(row, new_row)
             else:
                 new_row.extend([0,0,0,0])
 
-            # add features of last half day behavior
+            # add features of last half cart_day behavior
             if TimeUtil.format_date(row[5]) == (self.predict_day - 1) and TimeUtil.format_hour(row[5]) >= 12: 
                 self.append_four_features(row, new_row)
             else:
@@ -330,10 +330,10 @@ class FeatureGetter():
         self.add_user_feature()
         self.output()
         
-def train(day):
-    getter = FeatureGetter(day)
+def train(cart_day):
+    getter = FeatureGetter(cart_day)
     getter.get_features()
-    resultGetter = ResultsGetter(day)
+    resultGetter = ResultsGetter(cart_day)
     resultGetter.get_result()
     
 

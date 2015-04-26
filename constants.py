@@ -1,3 +1,4 @@
+from __builtin__ import staticmethod
 USER_ID = 0
 ITEM_ID = 1
 FEATURE_TWO_DAY_CLICK = 2
@@ -65,8 +66,8 @@ class TimeUtil():
         l = []
         for _ in range(5):
             month = yesterday / 100
-            day = yesterday % 100
-            l.append('2014-%d-%d' % (month, day))
+            cart_day = yesterday % 100
+            l.append('2014-%d-%d' % (month, cart_day))
             yesterday = TimeUtil.yesterday(yesterday)
         return l
     
@@ -74,32 +75,38 @@ class TimeUtil():
     def get_day_str(predict_day):
         month = str(predict_day / 100)
 
-        day = str(predict_day % 100) if predict_day % 100 >= 10 else '0' + str(predict_day % 100)
+        cart_day = str(predict_day % 100) if predict_day % 100 >= 10 else '0' + str(predict_day % 100)
 
-        return '2014-%s-%s' % (month, day)
+        return '2014-%s-%s' % (month, cart_day)
     
     @staticmethod
-    def yesterday(day):
+    def yesterday(cart_day):
         '''input: 1201
             output:1130
             designed for dates between 20141119 - 20141220
         '''
-        return day - 1 if day != 1201 else 1130
+        return cart_day - 1 if cart_day != 1201 else 1130
     
     @staticmethod
-    def seven_days_before(day):
+    def yesterday_str(day_str):
+        today = TimeUtil.format_date(day_str)
+        yesterday = TimeUtil.yesterday(today)
+        return TimeUtil.get_day_str(yesterday)
+    
+    @staticmethod
+    def seven_days_before(cart_day):
         for _ in range(7):
-            day = TimeUtil.yesterday(day)
-        return day
+            cart_day = TimeUtil.yesterday(cart_day)
+        return cart_day
     
     @staticmethod
-    def fifteen_days_before(day):
+    def fifteen_days_before(cart_day):
         for _ in range(15):
-            day = TimeUtil.yesterday(day)
-        return day
+            cart_day = TimeUtil.yesterday(cart_day)
+        return cart_day
     
     @staticmethod
-    def three_days_before(day):
+    def three_days_before(cart_day):
         for _ in range(3):
-            day = TimeUtil.yesterday(day)
-        return day
+            cart_day = TimeUtil.yesterday(cart_day)
+        return cart_day

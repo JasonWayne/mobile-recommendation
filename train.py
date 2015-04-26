@@ -9,6 +9,7 @@ from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.preprocessing import StandardScaler
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.learning_curve import learning_curve
+from sklearn.tree import DecisionTreeClassifier
 import matplotlib.pyplot as plt
 
 start_time = time.clock()
@@ -18,8 +19,8 @@ def getXy(list_of_days, down_sample=37):
     y = []
         
     for day in list_of_days:
-        reader_feature = csv.reader(file('output/features_%d.csv' % day, 'r'))
-        reader_result = csv.reader(file('output/y_%d.csv' % day, 'r'))
+        reader_feature = csv.reader(file('new_train/features_%d.csv' % day, 'r'))
+        reader_result = csv.reader(file('new_train/y_%d.csv' % day, 'r'))
 
         count = 0
         count_pos = 0
@@ -45,9 +46,9 @@ def getXy(list_of_days, down_sample=37):
 
 # X, y = getXy([1217, 1208, 1204, 1123], 60)
 # X, y = getXy([1218], 27)
-X, y = getXy([1218, 1208, 1127,1129,1204, 1205], 27)
-scalar = StandardScaler()
-X = scalar.fit_transform(X)
+X, y = getXy([1213], 8)
+# scalar = StandardScaler()
+# X = scalar.fit_transform(X)
 # train_sizes , train_scores, validation_scores = learning_curve(linear_model.LogisticRegression(), X, y, train_sizes=[x for x in range(100, 5000, 200)], cv=5)
 # plt.plot(train_sizes, train_scores, 'r')
 # plt.plot(train_sizes, validation_scores, 'b')
@@ -59,18 +60,19 @@ X = scalar.fit_transform(X)
 # clf =svm.SVC(kernel='rbf', C=3.1, gamma=0.6)
 # clf = svm.SVC(kernel='rbf', C=2.1, gamma=0.07)
 # clf = svm.SVC(kernel='rbf', C=30, gamma=0.2)
-# clf = svm.SVC()
-# clf = svm.SVC(kernel='linear')
-clf = linear_model.LogisticRegression(C=1)
+# clf = svm.SVC(kernel='poly', class_weight={1, 0:1})
+# clf = svm.SVC(class_weight={1: 13, 0: 1})
+# clf = linear_model.LogisticRegression(C=1)
 # clf = GradientBoostingClassifier()
 # clf = GradientBoostingRegressor()
+clf = sklearn.ensemble.RandomForestClassifier(20)
+# clf = DecisionTreeClassifier()
 clf.fit(X, y)
-# clf = sklearn.ensemble.RandomForestClassifier(500)
 # clf.fit(X, y)
 
 predict_day = 1217
-reader_feature = csv.reader(file('output/features_%d.csv' % predict_day, 'rb'))
-reader_result = csv.reader(file('output/y_%d.csv' % predict_day, 'rb'))
+reader_feature = csv.reader(file('new_train/features_%d.csv' % predict_day, 'rb'))
+reader_result = csv.reader(file('new_train/y_%d.csv' % predict_day, 'rb'))
 
 X = []
 y = []
@@ -79,7 +81,7 @@ for (a, b) in zip(reader_feature, reader_result):
     y.append(int(b[2]))
 
 
-X = scalar.transform(X)
+# X = scalar.transform(X)
 predict = clf.predict(X)
 
 
@@ -92,7 +94,7 @@ real_buy = csv.reader(file('output/real_buy_%d.csv' % predict_day, 'r'))
 buy_set = set()
 for row in real_buy:
     buy_set.add(tuple(row))
-reader_result = csv.reader(file('output/y_%d.csv' % predict_day, 'r'))
+reader_result = csv.reader(file('new_train/y_%d.csv' % predict_day, 'r'))
 result_set = set()
 for result, row in zip(predict, reader_result):
     if result:
@@ -111,16 +113,16 @@ print precision, recall, f1
 
 
 X = []
-reader = csv.reader(file('output/features_1219.csv', 'r'))
+reader = csv.reader(file('new_train/features_1219.csv', 'r'))
 for row in reader:
     X.append(map(lambda x: float(x), row[2:]))
-  
-X = scalar.transform(X)
+   
+# X = scalar.transform(X)
 predict = clf.predict(X)
-  
-writer = csv.writer(file('output/tianchi_mobile_recommendation_predict.csv', 'w'))
-reader = csv.reader(file('output/features_1219.csv', 'r'))
-    
+   
+writer = csv.writer(file('new_train/tianchi_mobile_recommendation_predict.csv', 'w'))
+reader = csv.reader(file('new_train/features_1219.csv', 'r'))
+     
 writer.writerow(['user_id', 'item_id'])
 for (x, y) in zip(reader, predict):
     if int(y) == 1:

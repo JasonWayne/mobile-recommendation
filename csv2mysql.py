@@ -38,7 +38,7 @@ for row in csv_data:
     if count % 1000 == 0:
 
         print 'INSERT %dth row' % count
-#         sql = INSERT_INTO_USER_TABLE 
+#         py = INSERT_INTO_USER_TABLE 
         sql = INSERT_INTO_ITEM_TABLE
         cursor.executemany(sql, data)
         db.commit()
